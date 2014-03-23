@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -106,12 +106,7 @@ static int snapshot_context_info(int id, void *ptr, void *data)
 {
 	struct kgsl_snapshot_linux_context *header = _ctxtptr;
 	struct kgsl_context *context = ptr;
-	struct kgsl_device *device;
-
-	if (context)
-		device = context->dev_priv->device;
-	else
-		device = (struct kgsl_device *)data;
+	struct kgsl_device *device = context->dev_priv->device;
 
 	header->id = id;
 
@@ -146,9 +141,6 @@ static int snapshot_os(struct kgsl_device *device,
 
 	idr_for_each(&device->context_idr, snapshot_context_count, &ctxtcount);
 
-	/* Increment ctxcount for the global memstore */
-	ctxtcount++;
-
 	size += ctxtcount * sizeof(struct kgsl_snapshot_linux_context);
 
 	/* Make sure there is enough room for the data */
@@ -177,15 +169,13 @@ static int snapshot_os(struct kgsl_device *device,
 	header->grpclk = kgsl_get_clkrate(pwr->grp_clks[0]);
 	header->busclk = kgsl_get_clkrate(pwr->ebi1_clk);
 
-	/* Save the last active context */
-	kgsl_sharedmem_readl(&device->memstore, &header->current_context,
-		KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL, current_context));
+	/* Future proof for per-context timestamps */
+	header->current_context = -1;
 
 	/* Get the current PT base */
 	header->ptbase = kgsl_mmu_get_current_ptbase(&device->mmu);
 	/* And the PID for the task leader */
-	pid = header->pid = kgsl_mmu_get_ptname_from_ptbase(&device->mmu,
-								header->ptbase);
+	pid = header->pid = kgsl_mmu_get_ptname_from_ptbase(header->ptbase);
 
 	task = find_task_by_vpid(pid);
 
@@ -194,12 +184,8 @@ static int snapshot_os(struct kgsl_device *device,
 
 	header->ctxtcount = ctxtcount;
 
-	_ctxtptr = snapshot + sizeof(*header);
-
-	/* append information for the global context */
-	snapshot_context_info(KGSL_MEMSTORE_GLOBAL, NULL, device);
-
 	/* append information for each context */
+	_ctxtptr = snapshot + sizeof(*header);
 	idr_for_each(&device->context_idr, snapshot_context_info, NULL);
 
 	/* Return the size of the data segment */
@@ -321,7 +307,7 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, unsigned int ptbase,
 	struct kgsl_snapshot_object *obj;
 	int offset;
 
-	entry = kgsl_get_mem_entry(device, ptbase, gpuaddr, size);
+	entry = kgsl_get_mem_entry(ptbase, gpuaddr, size);
 
 	if (entry == NULL) {
 		KGSL_DRV_ERR(device, "Unable to find GPU buffer %8.8X\n",
@@ -362,8 +348,8 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, unsigned int ptbase,
 	/* If the buffer is already on the list, skip it */
 	list_for_each_entry(obj, &device->snapshot_obj_list, node) {
 		if (obj->gpuaddr == gpuaddr && obj->ptbase == ptbase) {
-			/* If the size is different, use the bigger size */
-			if (obj->size < size)
+			/* If the size is different, use the new size */
+			if (obj->size != size)
 				obj->size = size;
 
 			return 0;
@@ -427,24 +413,18 @@ EXPORT_SYMBOL(kgsl_snapshot_get_object);
 int kgsl_snapshot_dump_regs(struct kgsl_device *device, void *snapshot,
 	int remain, void *priv)
 {
-	struct kgsl_snapshot_registers_list *list = priv;
-
 	struct kgsl_snapshot_regs *header = snapshot;
-	struct kgsl_snapshot_registers *regs;
+	struct kgsl_snapshot_registers *regs = priv;
 	unsigned int *data = snapshot + sizeof(*header);
-	int count = 0, i, j, k;
+	int count = 0, i, j;
 
 	/* Figure out how many registers we are going to dump */
 
-	for (i = 0; i < list->count; i++) {
-		regs = &(list->registers[i]);
+	for (i = 0; i < regs->count; i++) {
+		int start = regs->regs[i * 2];
+		int end = regs->regs[i * 2 + 1];
 
-		for (j = 0; j < regs->count; j++) {
-			int start = regs->regs[j * 2];
-			int end = regs->regs[j * 2 + 1];
-
-			count += (end - start + 1);
-		}
+		count += (end - start + 1);
 	}
 
 	if (remain < (count * 8) + sizeof(*header)) {
@@ -452,20 +432,16 @@ int kgsl_snapshot_dump_regs(struct kgsl_device *device, void *snapshot,
 		return 0;
 	}
 
+	for (i = 0; i < regs->count; i++) {
+		unsigned int start = regs->regs[i * 2];
+		unsigned int end = regs->regs[i * 2 + 1];
 
-	for (i = 0; i < list->count; i++) {
-		regs = &(list->registers[i]);
-		for (j = 0; j < regs->count; j++) {
-			unsigned int start = regs->regs[j * 2];
-			unsigned int end = regs->regs[j * 2 + 1];
+		for (j = start; j <= end; j++) {
+			unsigned int val;
 
-			for (k = start; k <= end; k++) {
-				unsigned int val;
-
-				kgsl_regread(device, k, &val);
-				*data++ = k;
-				*data++ = val;
-			}
+			kgsl_regread(device, j, &val);
+			*data++ = j;
+			*data++ = val;
 		}
 	}
 

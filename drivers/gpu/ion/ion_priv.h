@@ -2,7 +2,7 @@
  * drivers/gpu/ion/ion_priv.h
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -147,9 +147,6 @@ struct ion_heap_ops {
 			   const struct rb_root *mem_map);
 	int (*secure_heap)(struct ion_heap *heap, int version, void *data);
 	int (*unsecure_heap)(struct ion_heap *heap, int version, void *data);
-	int (*secure_buffer)(struct ion_buffer *buffer, int version,
-				void *data, int flags);
-	int (*unsecure_buffer)(struct ion_buffer *buffer, int force_unsecure);
 };
 
 /**
@@ -162,7 +159,6 @@ struct ion_heap_ops {
  *			allocating.  These are specified by platform data and
  *			MUST be unique
  * @name:		used for debugging
- * @priv:		private heap data
  *
  * Represents a pool of memory from which buffers can be made.  In some
  * systems the only heap is regular system memory allocated via vmalloc.
@@ -176,7 +172,6 @@ struct ion_heap {
 	struct ion_heap_ops *ops;
 	int id;
 	const char *name;
-	void *priv;
 };
 
 /**
@@ -259,10 +254,6 @@ ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap, unsigned long size,
 void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
 		       unsigned long size);
 
-#ifdef CONFIG_CMA
-struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *);
-void ion_cma_heap_destroy(struct ion_heap *);
-#endif
 
 struct ion_heap *msm_get_contiguous_heap(void);
 /**
@@ -316,10 +307,4 @@ void ion_cp_heap_get_base(struct ion_heap *heap, unsigned long *base,
 
 void ion_mem_map_show(struct ion_heap *heap);
 
-
-
-int ion_secure_handle(struct ion_client *client, struct ion_handle *handle,
-			int version, void *data, int flags);
-
-int ion_unsecure_handle(struct ion_client *client, struct ion_handle *handle);
 #endif /* _ION_PRIV_H */
