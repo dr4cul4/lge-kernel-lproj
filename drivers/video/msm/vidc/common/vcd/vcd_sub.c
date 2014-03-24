@@ -92,7 +92,7 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 	} else {
 		map_buffer->alloc_handle = ion_alloc(
 			    cctxt->vcd_ion_client, sz, SZ_4K,
-			    memtype, 0);
+			    memtype);
 		if (!map_buffer->alloc_handle) {
 			pr_err("%s() ION alloc failed", __func__);
 			goto bailout;
@@ -105,7 +105,8 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 		}
 		*kernel_vaddr = (u8 *) ion_map_kernel(
 				cctxt->vcd_ion_client,
-				map_buffer->alloc_handle);
+				map_buffer->alloc_handle,
+				ionflag);
 		if (!(*kernel_vaddr)) {
 			pr_err("%s() ION map failed", __func__);
 			goto ion_free_bailout;
@@ -119,7 +120,7 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 				0,
 				(unsigned long *)&iova,
 				(unsigned long *)&buffer_size,
-				0, 0);
+				UNCACHED, 0);
 			if (ret || !iova) {
 				pr_err(
 				"%s() ION iommu map failed, ret = %d, iova = 0x%lx",

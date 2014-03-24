@@ -26,7 +26,7 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/dma-mapping.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 
 #include <linux/delay.h>
 
@@ -219,10 +219,9 @@ static int audpcm_in_enable(struct audio_in *audio)
 	cfg.snd_method = RPC_SND_METHOD_MIDI;
 
 	rc = audmgr_enable(&audio->audmgr, &cfg);
-	if (rc < 0) {
-		msm_adsp_dump(audio->audrec);
+	if (rc < 0)
 		return rc;
-	}
+
 	if (audpreproc_enable(audio->enc_id, &audpre_dsp_event, audio)) {
 		MM_ERR("msm_adsp_enable(audpreproc) failed\n");
 		audmgr_disable(&audio->audmgr);
@@ -251,8 +250,6 @@ static int audpcm_in_enable(struct audio_in *audio)
 /* must be called with audio->lock held */
 static int audpcm_in_disable(struct audio_in *audio)
 {
-	int rc;
-
 	if (audio->enabled) {
 		audio->enabled = 0;
 
@@ -266,9 +263,7 @@ static int audpcm_in_disable(struct audio_in *audio)
 		/*reset the sampling frequency information at audpreproc layer*/
 		audio->session_info.sampling_freq = 0;
 		audpreproc_update_audrec_info(&audio->session_info);
-		rc = audmgr_disable(&audio->audmgr);
-		if (rc < 0)
-			msm_adsp_dump(audio->audrec);
+		audmgr_disable(&audio->audmgr);
 	}
 	return 0;
 }
@@ -851,7 +846,7 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 
 	MM_DBG("allocating mem sz = %d\n", DMASZ);
 	handle = ion_alloc(client, DMASZ, SZ_4K,
-		ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+		ION_HEAP(ION_AUDIO_HEAP_ID));
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate O/P buffers\n");
 		rc = -ENOMEM;
@@ -879,7 +874,7 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 		goto output_buff_get_flags_error;
 	}
 
-	audio->data = ion_map_kernel(client, handle);
+	audio->data = ion_map_kernel(client, handle, ionflag);
 	if (IS_ERR(audio->data)) {
 		MM_ERR("could not map read buffers,freeing instance 0x%08x\n",
 				(int)audio);

@@ -2546,7 +2546,7 @@ u32 mdp4_allocate_writeback_buf(struct msm_fb_data_type *mfd, u32 mix_num)
 		pr_info("%s:%d ion based allocation mfd->mem_hid 0x%x\n",
 			__func__, __LINE__, mfd->mem_hid);
 		buf->ihdl = ion_alloc(mfd->iclient, buffer_size, SZ_4K,
-			mfd->mem_hid, 0);
+			mfd->mem_hid);
 		if (!IS_ERR_OR_NULL(buf->ihdl)) {
 			if (mdp_iommu_split_domain) {
 				if (ion_map_iommu(mfd->iclient, buf->ihdl,
@@ -3300,17 +3300,4 @@ int mdp4_qseed_cfg(struct mdp_qseed_cfg_data *cfg)
 
 error:
 	return ret;
-}
-u32 mdp4_get_mixer_num(u32 panel_type)
-{
-	u32 mixer_num;
-	if ((panel_type == TV_PANEL) ||
-			(panel_type == DTV_PANEL))
-		mixer_num = MDP4_MIXER1;
-	else if (panel_type == WRITEBACK_PANEL) {
-		mixer_num = MDP4_MIXER2;
-	} else {
-		mixer_num = MDP4_MIXER0;
-	}
-	return mixer_num;
 }

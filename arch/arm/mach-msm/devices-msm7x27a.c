@@ -13,7 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
-#include <mach/kgsl.h>
+#include <linux/msm_kgsl.h>
 #include <linux/regulator/machine.h>
 #include <linux/init.h>
 #include <linux/irq.h>
@@ -220,7 +220,7 @@ struct platform_device msm_device_dmov = {
 };
 
 static struct acpuclk_pdata msm7x27a_acpuclk_pdata = {
-	.max_speed_delta_khz = 450000,
+	.max_speed_delta_khz = 400000,
 };
 
 struct platform_device msm7x27a_device_acpuclk = {
@@ -499,18 +499,6 @@ static struct msm_pm_irq_calls msm8625_pm_irq_calls = {
 	.exit_sleep2 = msm_gic_irq_exit_sleep2,
 	.exit_sleep3 = msm_gic_irq_exit_sleep3,
 };
-
-void msm_clk_dump_debug_info(void)
-{
-	pr_info("%s: GLBL_CLK_ENA: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x0));
-	pr_info("%s: GLBL_CLK_STATE: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x4));
-	pr_info("%s: GRP_NS_REG: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x84));
-	pr_info("%s: CLK_HALT_STATEB: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x10C));
-}
 
 void __init msm_pm_register_irqs(void)
 {
@@ -908,18 +896,13 @@ static struct resource kgsl_3d0_resources[] = {
 
 static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 	.pwrlevel = {
-		{
-			.gpu_freq = 380000000,
-                        .bus_freq = 245760000,
-		},
-		{
-			.gpu_freq = 355760000,
-                        .bus_freq = 213760000,
-		},
+		/* LGE_CHANGE_S [peter.jung@lge.com]
+		    DoU Power consumption */
 		{
 			.gpu_freq = 320000000,
 			.bus_freq = 200000000,
 		},
+		/* LGE_CHANGE_E [peter.jung@lge.com] */
 		{
 			.gpu_freq = 245760000,
 			.bus_freq = 200000000,
@@ -928,11 +911,15 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 			.gpu_freq = 192000000,
 			.bus_freq = 160000000,
 		},
+		{
+			.gpu_freq = 133330000,
+			.bus_freq = 0,
+		},
 	},
 	.init_level = 0,
 	/* LGE_CHANGE_S [peter.jung@lge.com]
 	     DoU Power consumption */
-	.num_levels = 5,
+	.num_levels = 4,
 	/* LGE_CHANGE_S [peter.jung@lge.com] */
 	.set_grp_async = set_grp_xbar_async,
 	.idle_timeout = HZ,
@@ -956,11 +943,9 @@ void __init msm7x25a_kgsl_3d0_init(void)
 	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa() || cpu_is_msm7x25ab()) {
 		kgsl_3d0_pdata.num_levels = 2;
 		kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 133330000;
-                kgsl_3d0_pdata.pwrlevel[0].bus_freq = 160000000;
-                kgsl_3d0_pdata.pwrlevel[1].gpu_freq = 96000000;
-                kgsl_3d0_pdata.pwrlevel[1].bus_freq = 0;
-
-
+		kgsl_3d0_pdata.pwrlevel[0].bus_freq = 160000000;
+		kgsl_3d0_pdata.pwrlevel[1].gpu_freq = 96000000;
+		kgsl_3d0_pdata.pwrlevel[1].bus_freq = 0;
 	}
 }
 
@@ -2176,7 +2161,6 @@ postcore_initcall(msm7627a_init_gpio);
 static int msm7627a_panic_handler(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
-	msm_clk_dump_debug_info();
 	flush_cache_all();
 	outer_flush_all();
 	return NOTIFY_DONE;

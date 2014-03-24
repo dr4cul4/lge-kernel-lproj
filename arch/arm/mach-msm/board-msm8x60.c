@@ -5432,7 +5432,9 @@ static struct ion_co_heap_pdata co_ion_pdata = {
  * to each other.
  * Don't swap the order unless you know what you are doing!
  */
-struct ion_platform_heap msm8x60_heaps[] = {
+static struct ion_platform_data ion_pdata = {
+	.nr = MSM_ION_HEAP_NUM,
+	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_SYSTEM,
@@ -5507,11 +5509,7 @@ struct ion_platform_heap msm8x60_heaps[] = {
 			.extra_data = (void *)&co_ion_pdata,
 		},
 #endif
-};
-
-static struct ion_platform_data ion_pdata = {
-	.nr = MSM_ION_HEAP_NUM,
-	.heaps = msm8x60_heaps,
+	}
 };
 
 static struct platform_device ion_dev = {
@@ -5565,8 +5563,7 @@ static void __init reserve_ion_memory(void)
 	for (i = 0; i < ion_pdata.nr; i++) {
 		struct ion_platform_heap *heap = &(ion_pdata.heaps[i]);
 
-		if (heap->extra_data &&
-			heap->type == (enum ion_heap_type) ION_HEAP_TYPE_CP) {
+		if (heap->extra_data && heap->type == ION_HEAP_TYPE_CP) {
 			int map_all = ((struct ion_cp_heap_pdata *)
 				heap->extra_data)->iommu_map_all;
 

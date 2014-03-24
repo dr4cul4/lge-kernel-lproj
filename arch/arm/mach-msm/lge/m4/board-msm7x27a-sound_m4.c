@@ -39,10 +39,6 @@
 
 #include <mach/pmic.h>
 
-#define NEW_ENDPOINTS
-
-#ifdef NEW_ENDPOINTS
-
 #define SND(desc, num) { .name = #desc, .id = num }
 static struct snd_endpoint snd_endpoints_list[] = {
 	SND(HANDSET, 0),
@@ -65,7 +61,7 @@ static struct snd_endpoint snd_endpoints_list[] = {
 };
 #undef SND
 
-#else
+#if 0
 #define SND(desc, num) { .name = #desc, .id = num }
 static struct snd_endpoint snd_endpoints_list[] = {
 	SND(HANDSET_LOOPBACK, 5),
@@ -348,7 +344,7 @@ static int m4eu_gpio_earsense_work_func(int *value)
 	int gpio_value;
 
 	msleep(100);
-
+	
 	gpio_value = !gpio_get_value(GPIO_EAR_SENSE);
 	printk(KERN_INFO "%s: ear sense detected : %s\n", __func__,
 		gpio_value ? "injected" : "ejected");
@@ -516,3 +512,4 @@ void __init lge_add_sound_devices(void)
 
 	platform_add_devices(m4eu_sound_devices, ARRAY_SIZE(m4eu_sound_devices));
 }
+

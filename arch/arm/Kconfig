@@ -255,14 +255,6 @@ config GENERIC_BUG
 	def_bool y
 	depends on BUG
 
-config ARCH_RANDOM
-	bool "SOC specific random number generation"
-	help
-	 Allow the kernel to use an architecture specific implementation for
-	 random number generation
-
-	 If unsure, say N
-
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
@@ -574,7 +566,7 @@ config ARCH_IXP4XX
 	select ARCH_HAS_DMA_SET_COHERENT_MASK
 	select CLKSRC_MMIO
 	select CPU_XSCALE
-	select ARCH_REQUIRE_GPIOLIB
+	select GENERIC_GPIO
 	select GENERIC_CLOCKEVENTS
 	select MIGHT_HAVE_PCI
 	select NEED_MACH_IO_H

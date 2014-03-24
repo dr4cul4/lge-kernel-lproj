@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2013, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,7 +24,7 @@
 #include <linux/msm_mdp.h>
 #include <linux/memory_alloc.h>
 #include <mach/hardware.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 
 #ifdef CONFIG_MSM_BUS_SCALING
 #include <mach/msm_bus.h>
@@ -72,14 +72,16 @@ extern uint32 mdp_intr_mask;
 #define MDPOP_SHARPENING	BIT(11) /* enable sharpening */
 #define MDPOP_BLUR		BIT(12) /* enable blur */
 #define MDPOP_FG_PM_ALPHA       BIT(13)
+/* vinay.bhooma@lge.com TD Fix issue 261189
+ * QUALCOMM Patch for SR#01078394 - Screen flickers on launching opera for 1st time.
+ * Target : UO/P700 
+ * Screen flickers for target which support MDP Composition.
+ * With GPU Composition model e.g. V3 screen flickering issue is not observed.
+*/ 
 #define MDPOP_LAYER_IS_FG       BIT(14)
-#define MDP_ALLOC(x)  kmalloc(x, GFP_KERNEL)
+/**End of QUALCOMM Patch for SR#01078394 - Screen flickers on launching opera for 1st time */
 
-struct splash_pages {
-	struct page **pages;
-	int nrpages;
-	unsigned long size;
-};
+#define MDP_ALLOC(x)  kmalloc(x, GFP_KERNEL)
 
 struct mdp_buf_type {
 	struct ion_handle *ihdl;
@@ -747,7 +749,7 @@ extern struct mdp_hist_mgmt *mdp_hist_mgmt_array[];
 #define MDP_DMA_P_LUT_C2_EN   BIT(2)
 #define MDP_DMA_P_LUT_POST    BIT(4)
 
-void mdp_hw_init(int cont_splash);
+void mdp_hw_init(void);
 int mdp_ppp_pipe_wait(void);
 void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd);
 void mdp_clk_ctrl(int on);
@@ -792,8 +794,6 @@ void mdp_dma3_update(struct msm_fb_data_type *mfd);
 int mdp_lcdc_on(struct platform_device *pdev);
 int mdp_lcdc_off(struct platform_device *pdev);
 void mdp_lcdc_update(struct msm_fb_data_type *mfd);
-
-void mdp_free_splash_buffer(struct msm_fb_data_type *mfd);
 
 #ifdef CONFIG_FB_MSM_MDP303
 int mdp_dsi_video_on(struct platform_device *pdev);
@@ -871,12 +871,6 @@ static inline int mdp_bus_scale_update_request(uint32_t index)
 void mdp_dma_vsync_ctrl(int enable);
 void mdp_dma_video_vsync_ctrl(int enable);
 void mdp_dma_lcdc_vsync_ctrl(int enable);
-ssize_t mdp_dma_show_event(struct device *dev,
-		struct device_attribute *attr, char *buf);
-ssize_t mdp_dma_video_show_event(struct device *dev,
-		struct device_attribute *attr, char *buf);
-ssize_t mdp_dma_lcdc_show_event(struct device *dev,
-		struct device_attribute *attr, char *buf);
 
 #ifdef MDP_HW_VSYNC
 void vsync_clk_prepare_enable(void);
@@ -939,8 +933,7 @@ int mdp_ppp_v4l2_overlay_clear(void);
 int mdp_ppp_v4l2_overlay_play(struct fb_info *info,
 	unsigned long srcp0_addr, unsigned long srcp0_size,
 	unsigned long srcp1_addr, unsigned long srcp1_size);
-void mdp_update_pm(struct msm_fb_data_type *mfd, ktime_t pre_vsync);
-u32 mdp_get_panel_framerate(struct msm_fb_data_type *mfd);
+
 #ifdef CONFIG_FB_MSM_DTV
 void mdp_vid_quant_set(void);
 #else
@@ -949,5 +942,4 @@ static inline void mdp_vid_quant_set(void)
 	/* empty */
 }
 #endif
-
 #endif /* MDP_H */

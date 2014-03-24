@@ -34,7 +34,7 @@
 #include <mach/camera.h>
 #include <linux/syscalls.h>
 #include <linux/hrtimer.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <mach/cpuidle.h>
 DEFINE_MUTEX(ctrl_cmd_lock);
 
@@ -1235,7 +1235,7 @@ static int msm_get_stats(struct msm_sync *sync, void __user *arg)
 	}
 
 	rc = 0;
-        memset(&stats, 0, sizeof(stats));
+
 	qcmd = msm_dequeue(&sync->event_q, list_config);
 	if (!qcmd) {
 		/* Should be associated with wait_event

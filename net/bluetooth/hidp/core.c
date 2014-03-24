@@ -1,7 +1,7 @@
 /*
    HIDP implementation for Linux Bluetooth stack (BlueZ).
    Copyright (C) 2003-2004 Marcel Holtmann <marcel@holtmann.org>
-   Copyright (c) 2012-2013 The Linux Foundation.  All rights reserved.
+   Copyright (c) 2012 Code Aurora Forum.  All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 2 as
@@ -93,33 +93,87 @@ static struct hidp_session *__hidp_get_session(bdaddr_t *bdaddr)
 	return NULL;
 }
 
+// +s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+#if 0
+static struct device *hidp_get_device(struct hidp_session *session)
+{
+	bdaddr_t *dst = &session->bdaddr;
+
+	struct device *device = NULL;
+	struct hci_dev *hdev;
+
+	hdev = hci_get_route(dst, BDADDR_ANY);
+	if (!hdev)
+		return NULL;
+
+	session->conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
+	if (session->conn)
+		device = &session->conn->dev;
+
+	hci_dev_put(hdev);
+
+	return device;
+}
+#endif
+// +e QCT_PATCH
+
 static void __hidp_link_session(struct hidp_session *session)
 {
 	__module_get(THIS_MODULE);
 	list_add(&session->list, &hidp_session_list);
+
+// -s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+/* Google Original
+	hci_conn_hold_device(session->conn);
+*/
+// -e QCT_PATCH
 }
 
+// +s QCT_BT_COMMON_PATCH_01039341 
 static void __hidp_unlink_session(struct hidp_session *session)
 {
+	//*s QCT_BT_PATCH_SR01110096 fix not to reset the device when a HID is turned on and off repeatedly kyuseok.kim@lge.com 2013-02-20
+	/* Original
 	bdaddr_t *dst = &session->bdaddr;
-	struct hci_dev *hdev;
-	struct device *dev = NULL;
+	struct hci_dev *hdev; 
+	struct device *dev = NULL; 
 
-	hdev = hci_get_route(dst, BDADDR_ANY);
-	if (hdev) {
-		session->conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
-		if (session->conn && session->conn->hidp_session_valid)
-			dev = &session->conn->dev;
+	hdev = hci_get_route(dst, BDADDR_ANY); 
+	if (hdev) { 
+		session->conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst); 
+		if (session->conn) 
+			dev = &session->conn->dev; 
 
-		hci_dev_put(hdev);
-	}
+		hci_dev_put(hdev); 
+	} 
 
-	if (dev)
+	if (dev) */
+	if (session->conn)
+	//*e QCT_BT_PATCH_SR01110096
+		hci_conn_put_device(session->conn); 
+
+	list_del(&session->list); 
+	module_put(THIS_MODULE); 
+} 
+/*
+static void __hidp_unlink_session(struct hidp_session *session)
+{
+// *s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+// Google Original
+//	struct device *dev;
+
+//	dev = hidp_get_device(session);
+//	if (dev)
+//
+	if (session->conn)
+// *e QCT_PATCH
 		hci_conn_put_device(session->conn);
 
 	list_del(&session->list);
 	module_put(THIS_MODULE);
 }
+*/ 
+// +e QCT_BT_COMMON_PATCH_01039341 
 
 static void __hidp_copy_session(struct hidp_session *session, struct hidp_conninfo *ci)
 {
@@ -648,6 +702,8 @@ static int hidp_session(void *arg)
 	return 0;
 }
 
+// +s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+//static struct hci_conn *hidp_find_connection(struct hidp_session *session)
 static struct hci_conn *hidp_get_connection(struct hidp_session *session)
 {
 	bdaddr_t *src = &bt_sk(session->ctrl_sock->sk)->src;
@@ -661,16 +717,15 @@ static struct hci_conn *hidp_get_connection(struct hidp_session *session)
 
 	hci_dev_lock_bh(hdev);
 	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
-	if (conn) {
-		conn->hidp_session_valid = true;
+	if (conn)
 		hci_conn_hold_device(conn);
-	}
 	hci_dev_unlock_bh(hdev);
 
 	hci_dev_put(hdev);
 
 	return conn;
 }
+// +e QCT_PATCH
 
 static int hidp_setup_input(struct hidp_session *session,
 				struct hidp_connadd_req *req)
@@ -719,7 +774,12 @@ static int hidp_setup_input(struct hidp_session *session,
 		input->relbit[0] |= BIT_MASK(REL_WHEEL);
 	}
 
+// *s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+/* Google Original
+	input->dev.parent = hidp_get_device(session);
+*/
 	input->dev.parent = &session->conn->dev;
+// *e QCT_PATCH
 
 	input->event = hidp_input_event;
 
@@ -820,7 +880,12 @@ static int hidp_setup_hid(struct hidp_session *session,
 	strncpy(hid->phys, batostr(&bt_sk(session->ctrl_sock->sk)->src), 64);
 	strncpy(hid->uniq, batostr(&bt_sk(session->ctrl_sock->sk)->dst), 64);
 
+// *s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+/* Google Original
+	hid->dev.parent = hidp_get_device(session);
+*/
 	hid->dev.parent = &session->conn->dev;
+// *e QCT_PATCH
 	hid->ll_driver = &hidp_hid_driver;
 
 	hid->hid_output_raw_report = hidp_output_raw_report;
@@ -878,11 +943,13 @@ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, 
 	session->intr_sock = intr_sock;
 	session->state     = BT_CONNECTED;
 
+// +s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
 	session->conn = hidp_get_connection(session);
 	if (!session->conn) {
 		err = -ENOTCONN;
 		goto failed;
 	}
+// +e QCT_PATCH
 
 	setup_timer(&session->timer, hidp_idle_timeout, (unsigned long)session);
 
@@ -892,13 +959,9 @@ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, 
 	session->flags   = req->flags & (1 << HIDP_BLUETOOTH_VENDOR_ID);
 	session->idle_to = req->idle_to;
 
-	/* If SCO is active, disable Sniff in Link Policy and unsniff HID Link */
-	if (hci_get_sco_status(session->conn)) {
-		hci_conn_update_sniff_lp(session->conn, false);
-		hci_conn_enter_active_mode(session->conn, true);
-	}
-
+// +s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
 	__hidp_link_session(session);
+// +e QCT_PATCH
 
 	if (req->rd_size > 0) {
 		err = hidp_setup_hid(session, req);
@@ -912,6 +975,11 @@ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, 
 			goto purge;
 	}
 
+// -s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+/* Google Original
+	__hidp_link_session(session);
+*/
+// -e QCT_PATCH
 	hidp_set_timer(session);
 
 	err = kernel_thread(hidp_session, session, CLONE_KERNEL);
@@ -933,6 +1001,12 @@ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, 
 unlink:
 	hidp_del_timer(session);
 
+// -s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
+/* Google Original
+	__hidp_unlink_session(session);
+*/
+// -e QCT_PATCH
+
 	if (session->input) {
 		input_unregister_device(session->input);
 		session->input = NULL;
@@ -947,7 +1021,9 @@ unlink:
 	session->rd_data = NULL;
 
 purge:
+// +s QCT_PATCH for bluetooth HID reconnection fail issue dongtaek.lee@lge.com 
 	__hidp_unlink_session(session);
+// +e QCT_PATCH
 
 	skb_queue_purge(&session->ctrl_transmit);
 	skb_queue_purge(&session->intr_transmit);
@@ -1054,37 +1130,6 @@ static struct hid_driver hidp_driver = {
 	.id_table = hidp_table,
 };
 
-void hidp_sco_state_changed(u8 state)
-{
-	struct list_head *p;
-	struct hidp_session *session;
-	BT_INFO("hidp_sco_state_changed, state = %d", state);
-
-	if (state) {
-		/* SCO is connected now, disable Sniff in link policy for all connected hid links */
-		list_for_each(p, &hidp_session_list) {
-			session = list_entry(p, struct hidp_session, list);
-			if (session) {
-				hci_conn_update_sniff_lp(session->conn, false);
-				hci_conn_enter_active_mode(session->conn, true);
-			}
-		}
-	} else {
-		/* SCO is disconnected now, enable back Sniff in link policy for all connected hid links */
-		list_for_each(p, &hidp_session_list) {
-			session = list_entry(p, struct hidp_session, list);
-			if (session) {
-				hci_conn_update_sniff_lp(session->conn, true);
-			}
-		}
-	}
-}
-
-static struct sco_cb hid_sco_cb = {
-	.name		= "HID",
-	.connect_state_changed	= hidp_sco_state_changed,
-};
-
 static int __init hidp_init(void)
 {
 	int ret;
@@ -1099,8 +1144,6 @@ static int __init hidp_init(void)
 	if (ret)
 		goto err_drv;
 
-	hci_register_sco_cb(&hid_sco_cb, true);
-
 	return 0;
 err_drv:
 	hid_unregister_driver(&hidp_driver);
@@ -1112,7 +1155,6 @@ static void __exit hidp_exit(void)
 {
 	hidp_cleanup_sockets();
 	hid_unregister_driver(&hidp_driver);
-	hci_register_sco_cb(&hid_sco_cb, false);
 }
 
 module_init(hidp_init);

@@ -2,7 +2,7 @@
  *
  * MSM MDP Interface (used by framebuffer core)
  *
- * Copyright (c) 2007-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2012, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -35,7 +35,6 @@
 #include <asm/mach-types.h>
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
-#include <mach/event_timer.h>
 #include <mach/clk.h>
 #include "mdp.h"
 #include "msm_fb.h"
@@ -51,7 +50,7 @@ static struct clk *mdp_pclk;
 static struct clk *mdp_lut_clk;
 int mdp_rev;
 int mdp_iommu_split_domain;
-u32 mdp_max_clk = 266667000;
+u32 mdp_max_clk = 200000000;
 
 static struct platform_device *mdp_init_pdev;
 static struct regulator *footswitch;
@@ -155,137 +154,6 @@ static uint32 mdp_prim_panel_type = NO_PANEL;
 struct list_head mdp_hist_lut_list;
 DEFINE_MUTEX(mdp_hist_lut_list_mutex);
 
-#define CM_LUT
-#ifdef CM_LUT
-
-
-/* From mako's arch/arm/mach-msm/lge/lge_qc_lcdc_luts.c
- * Copyright (c) 2011, LG Electronics. All rights reserved.
- *
- */
-
-/* pixel order : RBG */
-static uint32_t lcd_color_preset_lut[256] = {
-	/* default linear qlut */
-	0x00000000, 0x00010101, 0x00020202, 0x00030303,
-	0x00040404, 0x00050505, 0x00060606, 0x00070707,
-	0x00080808, 0x00090909, 0x000a0a0a, 0x000b0b0b,
-	0x000c0c0c, 0x000d0d0d, 0x000e0e0e, 0x000f0f0f,
-	0x00101010, 0x00111111, 0x00121212, 0x00131313,
-	0x00141414, 0x00151515, 0x00161616, 0x00171717,
-	0x00181818, 0x00191919, 0x001a1a1a, 0x001b1b1b,
-	0x001c1c1c, 0x001d1d1d, 0x001e1e1e, 0x001f1f1f,
-	0x00202020, 0x00212121, 0x00222222, 0x00232323,
-	0x00242424, 0x00252525, 0x00262626, 0x00272727,
-	0x00282828, 0x00292929, 0x002a2a2a, 0x002b2b2b,
-	0x002c2c2c, 0x002d2d2d, 0x002e2e2e, 0x002f2f2f,
-	0x00303030, 0x00313131, 0x00323232, 0x00333333,
-	0x00343434, 0x00353535, 0x00363636, 0x00373737,
-	0x00383838, 0x00393939, 0x003a3a3a, 0x003b3b3b,
-	0x003c3c3c, 0x003d3d3d, 0x003e3e3e, 0x003f3f3f,
-	0x00404040, 0x00414141, 0x00424242, 0x00434343,
-	0x00444444, 0x00454545, 0x00464646, 0x00474747,
-	0x00484848, 0x00494949, 0x004a4a4a, 0x004b4b4b,
-	0x004c4c4c, 0x004d4d4d, 0x004e4e4e, 0x004f4f4f,
-	0x00505050, 0x00515151, 0x00525252, 0x00535353,
-	0x00545454, 0x00555555, 0x00565656, 0x00575757,
-	0x00585858, 0x00595959, 0x005a5a5a, 0x005b5b5b,
-	0x005c5c5c, 0x005d5d5d, 0x005e5e5e, 0x005f5f5f,
-	0x00606060, 0x00616161, 0x00626262, 0x00636363,
-	0x00646464, 0x00656565, 0x00666666, 0x00676767,
-	0x00686868, 0x00696969, 0x006a6a6a, 0x006b6b6b,
-	0x006c6c6c, 0x006d6d6d, 0x006e6e6e, 0x006f6f6f,
-	0x00707070, 0x00717171, 0x00727272, 0x00737373,
-	0x00747474, 0x00757575, 0x00767676, 0x00777777,
-	0x00787878, 0x00797979, 0x007a7a7a, 0x007b7b7b,
-	0x007c7c7c, 0x007d7d7d, 0x007e7e7e, 0x007f7f7f,
-	0x00808080, 0x00818181, 0x00828282, 0x00838383,
-	0x00848484, 0x00858585, 0x00868686, 0x00878787,
-	0x00888888, 0x00898989, 0x008a8a8a, 0x008b8b8b,
-	0x008c8c8c, 0x008d8d8d, 0x008e8e8e, 0x008f8f8f,
-	0x00909090, 0x00919191, 0x00929292, 0x00939393,
-	0x00949494, 0x00959595, 0x00969696, 0x00979797,
-	0x00989898, 0x00999999, 0x009a9a9a, 0x009b9b9b,
-	0x009c9c9c, 0x009d9d9d, 0x009e9e9e, 0x009f9f9f,
-	0x00a0a0a0, 0x00a1a1a1, 0x00a2a2a2, 0x00a3a3a3,
-	0x00a4a4a4, 0x00a5a5a5, 0x00a6a6a6, 0x00a7a7a7,
-	0x00a8a8a8, 0x00a9a9a9, 0x00aaaaaa, 0x00ababab,
-	0x00acacac, 0x00adadad, 0x00aeaeae, 0x00afafaf,
-	0x00b0b0b0, 0x00b1b1b1, 0x00b2b2b2, 0x00b3b3b3,
-	0x00b4b4b4, 0x00b5b5b5, 0x00b6b6b6, 0x00b7b7b7,
-	0x00b8b8b8, 0x00b9b9b9, 0x00bababa, 0x00bbbbbb,
-	0x00bcbcbc, 0x00bdbdbd, 0x00bebebe, 0x00bfbfbf,
-	0x00c0c0c0, 0x00c1c1c1, 0x00c2c2c2, 0x00c3c3c3,
-	0x00c4c4c4, 0x00c5c5c5, 0x00c6c6c6, 0x00c7c7c7,
-	0x00c8c8c8, 0x00c9c9c9, 0x00cacaca, 0x00cbcbcb,
-	0x00cccccc, 0x00cdcdcd, 0x00cecece, 0x00cfcfcf,
-	0x00d0d0d0, 0x00d1d1d1, 0x00d2d2d2, 0x00d3d3d3,
-	0x00d4d4d4, 0x00d5d5d5, 0x00d6d6d6, 0x00d7d7d7,
-	0x00d8d8d8, 0x00d9d9d9, 0x00dadada, 0x00dbdbdb,
-	0x00dcdcdc, 0x00dddddd, 0x00dedede, 0x00dfdfdf,
-	0x00e0e0e0, 0x00e1e1e1, 0x00e2e2e2, 0x00e3e3e3,
-	0x00e4e4e4, 0x00e5e5e5, 0x00e6e6e6, 0x00e7e7e7,
-	0x00e8e8e8, 0x00e9e9e9, 0x00eaeaea, 0x00ebebeb,
-	0x00ececec, 0x00ededed, 0x00eeeeee, 0x00efefef,
-	0x00f0f0f0, 0x00f1f1f1, 0x00f2f2f2, 0x00f3f3f3,
-	0x00f4f4f4, 0x00f5f5f5, 0x00f6f6f6, 0x00f7f7f7,
-	0x00f8f8f8, 0x00f9f9f9, 0x00fafafa, 0x00fbfbfb,
-	0x00fcfcfc, 0x00fdfdfd, 0x00fefefe, 0x00ffffff
-};
-
-#define R_MASK    0x00ff0000
-#define G_MASK    0x000000ff
-#define B_MASK    0x0000ff00
-#define R_SHIFT   16
-#define G_SHIFT   0
-#define B_SHIFT   8
-#define lut2r(lut) ((lut & R_MASK) >> R_SHIFT)
-#define lut2g(lut) ((lut & G_MASK) >> G_SHIFT)
-#define lut2b(lut) ((lut & B_MASK) >> B_SHIFT)
-
-#define NUM_QLUT  256
-#define MAX_KCAL_V (NUM_QLUT-1)
-#define scaled_by_kcal(rgb, kcal) \
-                (((((unsigned int)(rgb) * (unsigned int)(kcal)) << 16) / \
-                (unsigned int)MAX_KCAL_V) >> 16)
-
-static int kcal_r = 255;
-static int kcal_g = 255;
-static int kcal_b = 255;
-int mdp_preset_lut_update_lcdc(struct fb_cmap *cmap, uint32_t *internal_lut);
-
-static ssize_t kcal_store(struct device *dev, struct device_attribute *attr,
-                                                const char *buf, size_t count)
-{
-        struct fb_cmap cmap;
-
-        cmap.start = 0;
-        cmap.len = 256;
-        cmap.transp = NULL;
-
-        if (!count)
-                return -EINVAL;
-
-
-        sscanf(buf, "%d %d %d", &kcal_r, &kcal_g, &kcal_b);
-
-        cmap.red = (uint16_t *)&(kcal_r);
-        cmap.green = (uint16_t *)&(kcal_g);
-        cmap.blue = (uint16_t *)&(kcal_b);
-
-	mdp_preset_lut_update_lcdc(&cmap, lcd_color_preset_lut);
-        return count;
-}
-
-static ssize_t kcal_show(struct device *dev, struct device_attribute *attr,
-                                                                char *buf)
-{
-        return sprintf(buf, "%d %d %d\n", kcal_r, kcal_g, kcal_b);
-}
-
-static DEVICE_ATTR(kcal, 0644, kcal_show, kcal_store);
-
-#endif
 uint32_t mdp_block2base(uint32_t block)
 {
 	uint32_t base = 0x0;
@@ -1587,40 +1455,6 @@ static int mdp_lut_hw_update(struct fb_cmap *cmap)
 	return 0;
 }
 
-#ifdef CM_LUT
-int mdp_preset_lut_update_lcdc(struct fb_cmap *cmap, uint32_t *internal_lut)
-{
-        uint32_t out;
-        int i;
-        u16 r, g, b;
-
-        mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-        mdp_clk_ctrl(1);
-
-        for (i = 0; i < cmap->len; i++) {
-                r = lut2r(internal_lut[i]);
-                g = lut2g(internal_lut[i]);
-                b = lut2b(internal_lut[i]);
-                r = scaled_by_kcal(r, *(cmap->red));
-                g = scaled_by_kcal(g, *(cmap->green));
-                b = scaled_by_kcal(b, *(cmap->blue));
-                MDP_OUTP(MDP_BASE + 0x94800 +
-                        (0x400*mdp_lut_i) + cmap->start*4 + i*4,
-                                ((g & 0xff) |
-                                 ((b & 0xff) << 8) |
-                                 ((r & 0xff) << 16)));
-        }
-
-        /*mask off non LUT select bits*/
-        out = inpdw(MDP_BASE + 0x90070) & ~((0x1 << 10) | 0x7);
-        MDP_OUTP(MDP_BASE + 0x90070, (mdp_lut_i << 10) | 0x7 | out);
-        mdp_clk_ctrl(0);
-        mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-        mdp_lut_i = (mdp_lut_i + 1)%2;
-        return 0;
-}
-#endif
-
 static int mdp_lut_push;
 static int mdp_lut_push_i;
 static int mdp_lut_update_nonlcdc(struct fb_info *info, struct fb_cmap *cmap)
@@ -1628,9 +1462,7 @@ static int mdp_lut_update_nonlcdc(struct fb_info *info, struct fb_cmap *cmap)
 	int ret;
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	mdp_clk_ctrl(1);
 	ret = mdp_lut_hw_update(cmap);
-	mdp_clk_ctrl(0);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	if (ret)
@@ -1652,11 +1484,9 @@ static int mdp_lut_update_lcdc(struct fb_info *info, struct fb_cmap *cmap)
 	uint32_t out;
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	mdp_clk_ctrl(1);
 	ret = mdp_lut_hw_update(cmap);
 
 	if (ret) {
-		mdp_clk_ctrl(0);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 		return ret;
 	}
@@ -1664,7 +1494,6 @@ static int mdp_lut_update_lcdc(struct fb_info *info, struct fb_cmap *cmap)
 	/*mask off non LUT select bits*/
 	out = inpdw(MDP_BASE + 0x90070) & ~((0x1 << 10) | 0x7);
 	MDP_OUTP(MDP_BASE + 0x90070, (mdp_lut_i << 10) | 0x7 | out);
-	mdp_clk_ctrl(0);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	mdp_lut_i = (mdp_lut_i + 1)%2;
 
@@ -1977,7 +1806,7 @@ static int mdp_histogram_disable(struct mdp_hist_mgmt *mgmt)
 	outp32(MDP_INTR_CLEAR, mgmt->intr);
 	mdp_intr_mask &= ~mgmt->intr;
 	outp32(MDP_INTR_ENABLE, mdp_intr_mask);
-	mdp_disable_irq_nosync(mgmt->irq_term);
+	mdp_disable_irq(mgmt->irq_term);
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
 	if (mdp_rev >= MDP_REV_42)
@@ -2069,7 +1898,6 @@ int mdp_histogram_start(struct mdp_histogram_start_req *req)
 	mgmt->frame_cnt = req->frame_cnt;
 	mgmt->bit_mask = req->bit_mask;
 	mgmt->num_bins = req->num_bins;
-	mgmt->hist = NULL;
 
 	ret = mdp_histogram_enable(mgmt);
 
@@ -2162,7 +1990,6 @@ static int _mdp_histogram_read_dma_data(struct mdp_hist_mgmt *mgmt)
 	}
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	mdp_clk_ctrl(1);
 	for (i = 0; i < mgmt->num_bins; i++) {
 		mgmt->c0[i] = inpdw(mdp_hist_base + r_data_offset + (4*i));
 		mgmt->c1[i] = inpdw(mdp_hist_base + g_data_offset + (4*i));
@@ -2178,7 +2005,6 @@ static int _mdp_histogram_read_dma_data(struct mdp_hist_mgmt *mgmt)
 		} else
 			ret = -ENOMEM;
 	}
-	mdp_clk_ctrl(0);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	if (!ret)
@@ -2214,7 +2040,6 @@ static int _mdp_histogram_read_vg_data(struct mdp_hist_mgmt *mgmt)
 	}
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	mdp_clk_ctrl(1);
 	for (i = 0; i < mgmt->num_bins; i++)
 		mgmt->c0[i] = inpdw(mdp_hist_base + MDP_HIST_DATA_LUMA_OFF +
 									(4*i));
@@ -2226,7 +2051,6 @@ static int _mdp_histogram_read_vg_data(struct mdp_hist_mgmt *mgmt)
 		} else
 			ret = -ENOMEM;
 	}
-	mdp_clk_ctrl(0);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	if (!ret)
@@ -2423,7 +2247,7 @@ static void vsync_isr_handler(void)
 }
 #endif
 
-ssize_t mdp_dma_show_event(struct device *dev,
+static ssize_t vsync_show_event(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
@@ -2457,123 +2281,13 @@ int mdp_ppp_pipe_wait(void)
 	if (wait == TRUE) {
 		ret = wait_for_completion_interruptible_timeout(&mdp_ppp_comp,
 								5 * HZ);
+
 		if (!ret)
 			printk(KERN_ERR "%s: Timed out waiting for the MDP.\n",
-				__func__);
+					__func__);
 	}
 
 	return ret;
-}
-
-#define MAX_VSYNC_GAP		4
-#define DEFAULT_FRAME_RATE	60
-
-u32 mdp_get_panel_framerate(struct msm_fb_data_type *mfd)
-{
-	u32 frame_rate = 0, pixel_rate = 0, total_pixel;
-	struct msm_panel_info *panel_info = &mfd->panel_info;
-
-       if ((panel_info->type == MIPI_VIDEO_PANEL ||
-	     panel_info->type == MIPI_CMD_PANEL) &&
-	    panel_info->mipi.frame_rate)
-		frame_rate = panel_info->mipi.frame_rate;
-
-	if (mfd->dest == DISPLAY_LCD) {
-		if (panel_info->type == MDDI_PANEL && panel_info->mddi.is_type1)
-			frame_rate = panel_info->lcd.refx100 / (100 * 2);
-		else if (panel_info->type != MIPI_CMD_PANEL)
-			frame_rate = panel_info->lcd.refx100 / 100;
-	}
-	pr_debug("%s type=%d frame_rate=%d\n", __func__,
-		 panel_info->type, frame_rate);
-
-	if (frame_rate)
-		return frame_rate;
-
-	pixel_rate =
-		(panel_info->type == MIPI_CMD_PANEL ||
-		 panel_info->type == MIPI_VIDEO_PANEL) ?
-		panel_info->mipi.dsi_pclk_rate :
-		panel_info->clk_rate;
-
-	if (!pixel_rate)
-		pr_warn("%s pixel rate is zero\n", __func__);
-
-	total_pixel =
-		(panel_info->lcdc.h_back_porch +
-		 panel_info->lcdc.h_front_porch +
-		 panel_info->lcdc.h_pulse_width +
-		 panel_info->xres) *
-		(panel_info->lcdc.v_back_porch +
-		 panel_info->lcdc.v_front_porch +
-		 panel_info->lcdc.v_pulse_width +
-		 panel_info->yres);
-
-	if (total_pixel)
-		frame_rate = pixel_rate / total_pixel;
-	else
-		pr_warn("%s total pixels are zero\n", __func__);
-
-	if (frame_rate == 0) {
-		frame_rate = DEFAULT_FRAME_RATE;
-		pr_warn("%s frame rate=%d is default\n", __func__, frame_rate);
-	}
-	pr_debug("%s frame rate=%d total_pixel=%d, pixel_rate=%d\n", __func__,
-		frame_rate, total_pixel, pixel_rate);
-
-	return frame_rate;
-}
-
-static int mdp_diff_to_next_vsync(ktime_t cur_time,
-			ktime_t last_vsync, u32 vsync_period)
-{
-	int diff_from_last, diff_to_next;
-	/*
-	 * Get interval beween last vsync and current time
-	 * Current time = CPU programming MDP for next Vsync
-	 */
-	diff_from_last =
-		(ktime_to_us(ktime_sub(cur_time, last_vsync)));
-	diff_from_last /= USEC_PER_MSEC;
-	/*
-	 * If the last Vsync occurred too long ago, skip programming
-	 * the timer
-	 */
-	if (diff_from_last < (vsync_period * MAX_VSYNC_GAP)) {
-		if (diff_from_last > vsync_period)
-			diff_to_next =
-				(diff_from_last - vsync_period) % vsync_period;
-		else
-			diff_to_next = vsync_period - diff_from_last;
-	} else {
-		/* mark it out of range */
-		diff_to_next = vsync_period + 1;
-	}
-	return diff_to_next;
-}
-
-void mdp_update_pm(struct msm_fb_data_type *mfd, ktime_t pre_vsync)
-{
-	u32 vsync_period;
-	int diff_to_next;
-	ktime_t cur_time, wakeup_time;
-
-	if (!mfd->cpu_pm_hdl)
-		return;
-	vsync_period = mfd->panel_info.frame_interval;
-	cur_time = ktime_get();
-	diff_to_next = mdp_diff_to_next_vsync(cur_time,
-					      pre_vsync,
-					      vsync_period);
-	if (diff_to_next > vsync_period)
-		return;
-	pr_debug("%s cur_time %d, pre_vsync %d, to_next %d\n",
-		 __func__,
-		 (int)ktime_to_ms(cur_time),
-		 (int)ktime_to_ms(pre_vsync),
-		 diff_to_next);
-	wakeup_time = ktime_add_ns(cur_time, diff_to_next * NSEC_PER_MSEC);
-	activate_event_timer(mfd->cpu_pm_hdl, wakeup_time);
 }
 
 static DEFINE_SPINLOCK(mdp_lock);
@@ -3086,14 +2800,20 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 			dma = &dma2_data;
 			spin_lock_irqsave(&mdp_spin_lock, flag);
 			vsync_isr = vsync_cntrl.vsync_irq_enabled;
+			// QCT_PATCH_S, SR#01031271 bohyun.jung@lge.com
+			// SR 01031271 - 'mdp_disable_irq_nosync: MDP IRQ term-0x1000 is NOT set, mask=1 irq=1' 
 			disabled_clocks = vsync_cntrl.disabled_clocks;
+			// QCT_PATCH_E, SR#01031271 bohyun.jung@lge.com
 			/* let's disable LCDC interrupt */
 			if (dma->waiting) {
 				dma->waiting = FALSE;
 				complete(&dma->comp);
 			}
 
+			// QCT_PATCH_S, SR#01031271 bohyun.jung@lge.com
 			if (!vsync_isr && !vsync_cntrl.disabled_clocks) {
+			//if (!vsync_isr) {
+			// QCT_PATCH_E, SR#01031271 bohyun.jung@lge.com
 				mdp_intr_mask &= ~LCDC_FRAME_START;
 				outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 				mdp_disable_irq_nosync(MDP_VSYNC_TERM);
@@ -3103,7 +2823,10 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 			}
 			spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
+			// QCT_PATCH_S, SR#01031271 bohyun.jung@lge.com
 			if (!vsync_isr && !disabled_clocks)
+			//if (!vsync_isr)
+			// QCT_PATCH_E, SR#01031271 bohyun.jung@lge.com
 				mdp_pipe_ctrl(MDP_CMD_BLOCK,
 					MDP_BLOCK_POWER_OFF, TRUE);
 
@@ -3329,12 +3052,6 @@ static struct platform_driver mdp_driver = {
 	},
 };
 
-static int mdp_fps_level_change(struct platform_device *pdev, u32 fps_level)
-{
-	int ret = 0;
-	ret = panel_next_fps_level_change(pdev, fps_level);
-	return ret;
-}
 static int mdp_off(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -3346,9 +3063,6 @@ static int mdp_off(struct platform_device *pdev)
 	atomic_set(&vsync_cntrl.vsync_resume, 0);
 	complete_all(&vsync_cntrl.vsync_wait);
 	mdp_clk_ctrl(1);
-
-	ret = panel_next_early_off(pdev);
-
 	if (mfd->panel.type == MIPI_CMD_PANEL)
 		mdp4_dsi_cmd_off(pdev);
 	else if (mfd->panel.type == MIPI_VIDEO_PANEL)
@@ -3361,7 +3075,6 @@ static int mdp_off(struct platform_device *pdev)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	ret = panel_next_off(pdev);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-
 	mdp_clk_ctrl(0);
 
 	if (mdp_rev >= MDP_REV_41 && mfd->panel.type == MIPI_CMD_PANEL)
@@ -3381,6 +3094,15 @@ void mdp4_hw_init(void)
 }
 
 #endif
+static DEVICE_ATTR(vsync_event, S_IRUGO, vsync_show_event, NULL);
+static struct attribute *vsync_fs_attrs[] = {
+	&dev_attr_vsync_event.attr,
+	NULL,
+};
+static struct attribute_group vsync_fs_attr_group = {
+	.attrs = vsync_fs_attrs,
+};
+
 static int mdp_on(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -3412,8 +3134,21 @@ static int mdp_on(struct platform_device *pdev)
 	if (mdp_rev == MDP_REV_303 && mfd->panel.type == MIPI_CMD_PANEL) {
 
 		vsync_cntrl.dev = mfd->fbi->dev;
+
+		if (!vsync_cntrl.sysfs_created) {
+			ret = sysfs_create_group(&vsync_cntrl.dev->kobj,
+				&vsync_fs_attr_group);
+			if (ret) {
+				pr_err("%s: sysfs creation failed, ret=%d\n",
+					__func__, ret);
+				return ret;
+			}
+
+			kobject_uevent(&vsync_cntrl.dev->kobj, KOBJ_ADD);
+			pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
+			vsync_cntrl.sysfs_created = 1;
+		}
 		atomic_set(&vsync_cntrl.suspend, 0);
-		atomic_set(&vsync_cntrl.vsync_resume, 1);
 	}
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -3422,10 +3157,6 @@ static int mdp_on(struct platform_device *pdev)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	mdp_histogram_ctrl_all(TRUE);
-
-	if (ret == 0)
-		ret = panel_next_late_init(pdev);
-
 	pr_debug("%s:-\n", __func__);
 
 	return ret;
@@ -3689,7 +3420,6 @@ static int mdp_probe(struct platform_device *pdev)
 	int rc;
 	resource_size_t  size ;
 	unsigned long flag;
-	u32 frame_rate;
 #ifdef CONFIG_FB_MSM_MDP40
 	int intf, if_no;
 #endif
@@ -3697,10 +3427,6 @@ static int mdp_probe(struct platform_device *pdev)
 	struct mipi_panel_info *mipi;
 #endif
 	static int contSplash_update_done;
-	void *splash_virt_addr;
-	int cur_page;
-	unsigned long cur_addr;
-	struct splash_pages page_data;
 
 	if ((pdev->id == 0) && (pdev->num_resources > 0)) {
 		mdp_init_pdev = pdev;
@@ -3738,7 +3464,7 @@ static int mdp_probe(struct platform_device *pdev)
 		if (!(mdp_pdata->cont_splash_enabled))
 			mdp4_hw_init();
 #else
-		mdp_hw_init(mdp_pdata->cont_splash_enabled);
+		mdp_hw_init();
 #endif
 
 #ifdef CONFIG_FB_MSM_OVERLAY
@@ -3771,74 +3497,9 @@ static int mdp_probe(struct platform_device *pdev)
 	/* link to the latest pdev */
 	mfd->pdev = msm_fb_dev;
 	mfd->mdp_rev = mdp_rev;
-	mfd->vsync_init = NULL;
 
 	if (mdp_pdata) {
 		if (mdp_pdata->cont_splash_enabled) {
-			uint32 bpp = 3;
-			mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-			/*read panel wxh and calculate splash screen
-			size*/
-			mdp_pdata->splash_screen_size =
-			inpdw(MDP_BASE + 0x90004);
-			mdp_pdata->splash_screen_size =
-				(((mdp_pdata->splash_screen_size >> 16) &
-				0x00000FFF) * (
-				mdp_pdata->splash_screen_size &
-				0x00000FFF)) * bpp;
-
-			mdp_pdata->splash_screen_addr =
-				inpdw(MDP_BASE + 0x90008);
-
-			mfd->copy_splash_buf = dma_alloc_coherent(NULL,
-				mdp_pdata->splash_screen_size,
-				(dma_addr_t *) &(mfd->copy_splash_phys),
-				GFP_KERNEL);
-
-			if (!mfd->copy_splash_buf) {
-				pr_err("DMA ALLOC FAILED for SPLASH\n");
-				return -ENOMEM;
-			}
-
-			page_data.size = PFN_ALIGN(mdp_pdata->splash_screen_size);
-			page_data.nrpages = (page_data.size) >> PAGE_SHIFT;
-			page_data.pages = kzalloc(sizeof(struct page *)*page_data.nrpages,
-						GFP_KERNEL);
-			if (!page_data.pages) {
-				pr_err("KZALLOC FAILED for PAGES\n");
-				return -ENOMEM;
-			}
-
-			/* Following code for obtaining the virtual address for splash
-			screen address relies on the fact that, splash screen buffer is
-			part of the kernel's memory map and this code need to be changed
-			if the memory comes from outside the kernel. */
-			cur_addr = mdp_pdata->splash_screen_addr;
-			for(cur_page = 0; cur_page < page_data.nrpages; cur_page++) {
-				page_data.pages[cur_page] = phys_to_page(cur_addr);
-				if (!page_data.pages[cur_page]) {
-					pr_err("PHYS_TO_PAGE FAILED for SPLASH\n");
-					kfree(page_data.pages);
-					return -ENOMEM;
-	                        }
-				cur_addr += (1 << PAGE_SHIFT);
-			}
-			splash_virt_addr = vmap(page_data.pages, page_data.nrpages,
-					VM_IOREMAP, pgprot_kernel);
-			if (!splash_virt_addr) {
-				pr_err("VMAP FAILED for SPLASH\n");
-				kfree(page_data.pages);
-				return -ENOMEM;
-                        }
-			memcpy(mfd->copy_splash_buf, splash_virt_addr,
-				mdp_pdata->splash_screen_size);
-			vunmap(splash_virt_addr);
-			kfree(page_data.pages);
-
-			MDP_OUTP(MDP_BASE + 0x90008,
-				mfd->copy_splash_phys);
-			mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-
 			mfd->cont_splash_done = 0;
 			if (!contSplash_update_done) {
 				if (mfd->panel.type == MIPI_VIDEO_PANEL)
@@ -3882,8 +3543,6 @@ static int mdp_probe(struct platform_device *pdev)
 	pdata = msm_fb_dev->dev.platform_data;
 	pdata->on = mdp_on;
 	pdata->off = mdp_off;
-	pdata->fps_level_change = mdp_fps_level_change;
-	pdata->late_init = NULL;
 	pdata->next = pdev;
 
 	mdp_clk_ctrl(1);
@@ -3966,8 +3625,7 @@ static int mdp_probe(struct platform_device *pdev)
 	case MIPI_VIDEO_PANEL:
 #ifndef CONFIG_FB_MSM_MDP303
 		mipi = &mfd->panel_info.mipi;
-		mfd->vsync_init = mdp4_dsi_vsync_init;
-		mfd->vsync_show = mdp4_dsi_video_show_event;
+		mdp4_dsi_vsync_init(0);
 		mfd->hw_refresh = TRUE;
 		mfd->dma_fnc = mdp4_dsi_video_overlay;
 		mfd->lut_update = mdp_lut_update_lcdc;
@@ -3994,7 +3652,6 @@ static int mdp_probe(struct platform_device *pdev)
 		mfd->start_histogram = mdp_histogram_start;
 		mfd->stop_histogram = mdp_histogram_stop;
 		mfd->vsync_ctrl = mdp_dma_video_vsync_ctrl;
-		mfd->vsync_show = mdp_dma_video_show_event;
 		if (mfd->panel_info.pdest == DISPLAY_1)
 			mfd->dma = &dma2_data;
 		else {
@@ -4015,8 +3672,7 @@ static int mdp_probe(struct platform_device *pdev)
 #ifndef CONFIG_FB_MSM_MDP303
 		mfd->dma_fnc = mdp4_dsi_cmd_overlay;
 		mipi = &mfd->panel_info.mipi;
-		mfd->vsync_init = mdp4_dsi_rdptr_init;
-		mfd->vsync_show = mdp4_dsi_cmd_show_event;
+		mdp4_dsi_rdptr_init(0);
 		if (mfd->panel_info.pdest == DISPLAY_1) {
 			if_no = PRIMARY_INTF_SEL;
 			mfd->dma = &dma2_data;
@@ -4047,7 +3703,6 @@ static int mdp_probe(struct platform_device *pdev)
 		mfd->start_histogram = mdp_histogram_start;
 		mfd->stop_histogram = mdp_histogram_stop;
 		mfd->vsync_ctrl = mdp_dma_vsync_ctrl;
-		mfd->vsync_show = mdp_dma_show_event;
 		if (mfd->panel_info.pdest == DISPLAY_1)
 			mfd->dma = &dma2_data;
 		else {
@@ -4065,8 +3720,7 @@ static int mdp_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_FB_MSM_DTV
 	case DTV_PANEL:
-		mfd->vsync_init = mdp4_dtv_vsync_init;
-		mfd->vsync_show = mdp4_dtv_show_event;
+		mdp4_dtv_vsync_init(0);
 		pdata->on = mdp4_dtv_on;
 		pdata->off = mdp4_dtv_off;
 		mfd->hw_refresh = TRUE;
@@ -4102,8 +3756,7 @@ static int mdp_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_FB_MSM_MDP40
-		mfd->vsync_init = mdp4_lcdc_vsync_init;
-		mfd->vsync_show = mdp4_lcdc_show_event;
+		mdp4_lcdc_vsync_init(0);
 		if (mfd->panel.type == HDMI_PANEL) {
 			mfd->dma = &dma_e_data;
 			mdp4_display_intf_sel(EXTERNAL_INTF_SEL, LCDC_RGB_INTF);
@@ -4114,7 +3767,6 @@ static int mdp_probe(struct platform_device *pdev)
 #else
 		mfd->dma = &dma2_data;
 		mfd->vsync_ctrl = mdp_dma_lcdc_vsync_ctrl;
-		mfd->vsync_show = mdp_dma_lcdc_show_event;
 		spin_lock_irqsave(&mdp_spin_lock, flag);
 		mdp_intr_mask &= ~MDP_DMA_P_DONE;
 		outp32(MDP_INTR_ENABLE, mdp_intr_mask);
@@ -4175,11 +3827,6 @@ static int mdp_probe(struct platform_device *pdev)
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	}
 
-	frame_rate = mdp_get_panel_framerate(mfd);
-	if (frame_rate) {
-		mfd->panel_info.frame_interval = 1000 / frame_rate;
-		mfd->cpu_pm_hdl = add_event_timer(NULL, (void *)mfd);
-	}
 	mdp_clk_ctrl(0);
 
 #ifdef CONFIG_MSM_BUS_SCALING
@@ -4225,35 +3872,6 @@ static int mdp_probe(struct platform_device *pdev)
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	mdp4_extn_disp = 0;
-
-#ifdef CM_LUT
-	rc = device_create_file(&pdev->dev, &dev_attr_kcal);
-#endif
-        /* vsync_init call not required for mdp3
-         * vsync_init call required for mdp4 targets*/
-	if ((mfd->vsync_init != NULL) || (mdp_rev < MDP_REV_40)) {
-		if (mdp_rev >= MDP_REV_40)
-			mfd->vsync_init(0);
-
-		if (!mfd->vsync_sysfs_created) {
-			mfd->dev_attr.attr.name = "vsync_event";
-			mfd->dev_attr.attr.mode = S_IRUGO;
-			mfd->dev_attr.show = mfd->vsync_show;
-			sysfs_attr_init(&mfd->dev_attr.attr);
-
-			rc = sysfs_create_file(&mfd->fbi->dev->kobj,
-							&mfd->dev_attr.attr);
-			if (rc) {
-				pr_err("%s: sysfs creation failed, ret=%d\n",
-					__func__, rc);
-				return rc;
-			}
-
-			kobject_uevent(&mfd->fbi->dev->kobj, KOBJ_ADD);
-			pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
-			mfd->vsync_sysfs_created = 1;
-		}
-	}
 	return 0;
 
       mdp_probe_err:
@@ -4286,17 +3904,6 @@ void mdp_footswitch_ctrl(boolean on)
 	}
 
 	mutex_unlock(&mdp_suspend_mutex);
-}
-
-void mdp_free_splash_buffer(struct msm_fb_data_type *mfd)
-{
-	if (mfd->copy_splash_buf) {
-		dma_free_coherent(NULL, mdp_pdata->splash_screen_size,
-				mfd->copy_splash_buf,
-				(dma_addr_t) mfd->copy_splash_phys);
-
-		mfd->copy_splash_buf = NULL;
-	}
 }
 
 #ifdef CONFIG_PM
@@ -4371,9 +3978,6 @@ static int mdp_remove(struct platform_device *pdev)
 	if (mdp_pdata && mdp_pdata->mdp_bus_scale_table &&
 		mdp_bus_scale_handle > 0)
 		msm_bus_scale_unregister_client(mdp_bus_scale_handle);
-#endif
-#ifdef CM_LUT
-	device_remove_file(&pdev->dev, &dev_attr_kcal);
 #endif
 	return 0;
 }

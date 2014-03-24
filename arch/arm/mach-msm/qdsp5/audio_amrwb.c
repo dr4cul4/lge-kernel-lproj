@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009, 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009, 2011-2012 Code Aurora Forum. All rights reserved.
  *
  * All source code in this file is licensed under the following license except
  * where indicated.
@@ -41,7 +41,7 @@
 #include <linux/slab.h>
 #include <linux/msm_audio.h>
 #include <linux/memory_alloc.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 
 #include <mach/msm_adsp.h>
 #include <mach/iommu.h>
@@ -262,10 +262,8 @@ static int audamrwb_enable(struct audio *audio)
 		cfg.snd_method = RPC_SND_METHOD_MIDI;
 
 		rc = audmgr_enable(&audio->audmgr, &cfg);
-		if (rc < 0) {
-			msm_adsp_dump(audio->audplay);
+		if (rc < 0)
 			return rc;
-		}
 	}
 
 	if (msm_adsp_enable(audio->audplay)) {
@@ -309,11 +307,8 @@ static int audamrwb_disable(struct audio *audio)
 		wake_up(&audio->read_wait);
 		msm_adsp_disable(audio->audplay);
 		audpp_disable(audio->dec_id, audio);
-		if (audio->pcm_feedback == TUNNEL_MODE_PLAYBACK) {
-			rc = audmgr_disable(&audio->audmgr);
-			if (rc < 0)
-				msm_adsp_dump(audio->audplay);
-		}
+		if (audio->pcm_feedback == TUNNEL_MODE_PLAYBACK)
+			audmgr_disable(&audio->audmgr);
 		audio->out_needed = 0;
 		rmt_put_resource(audio);
 		audio->rmt_resource_released = 1;
@@ -982,7 +977,7 @@ static long audamrwb_ioctl(struct file *file, unsigned int cmd,
 				handle = ion_alloc(audio->client,
 					(config.buffer_size *
 					config.buffer_count),
-					SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+					SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID));
 				if (IS_ERR_OR_NULL(handle)) {
 					MM_ERR("Unable to alloc I/P buffs\n");
 					audio->input_buff_handle = NULL;
@@ -1019,7 +1014,8 @@ static long audamrwb_ioctl(struct file *file, unsigned int cmd,
 					break;
 				}
 				audio->map_v_read = ion_map_kernel(
-					audio->client, handle);
+					audio->client,
+					handle, ionflag);
 			if (IS_ERR(audio->map_v_read)) {
 				MM_ERR("failed to map mem for read buf\n");
 				ion_free(audio->client, handle);
@@ -1253,10 +1249,7 @@ static int audamrwb_process_eos(struct audio *audio,
 		rc = -EBUSY;
 		goto done;
 	}
-	if (mfield_size > audio->out[0].size) {
-		rc = -EINVAL;
-		goto done;
-	}
+
 	if (copy_from_user(frame->data, buf_start, mfield_size)) {
 		rc = -EFAULT;
 		goto done;
@@ -1314,10 +1307,6 @@ static ssize_t audamrwb_write(struct file *file, const char __user *buf,
 					rc = -EINVAL;
 					break;
 				}
-				if (mfield_size > audio->out[0].size) {
-					rc = -EINVAL;
-					break;
-				}
 				MM_DBG("mf offset_val %x\n", mfield_size);
 				if (copy_from_user(cpy_ptr, buf, mfield_size)) {
 					rc = -EFAULT;
@@ -1351,10 +1340,6 @@ static ssize_t audamrwb_write(struct file *file, const char __user *buf,
 		if (audio->reserved) {
 			MM_DBG("append reserved byte %x\n", audio->rsv_byte);
 			*cpy_ptr = audio->rsv_byte;
-			if (mfield_size > frame->size) {
-				rc = -EINVAL;
-				break;
-			}
 			xfer = (count > ((frame->size - mfield_size) - 1)) ?
 				((frame->size - mfield_size) - 1) : count;
 			cpy_ptr++;
@@ -1615,7 +1600,7 @@ static int audamrwb_open(struct inode *inode, struct file *file)
 	audio->client = client;
 
 	handle = ion_alloc(client, mem_sz, SZ_4K,
-		ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+		ION_HEAP(ION_AUDIO_HEAP_ID));
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate O/P buffers\n");
 		goto output_buff_alloc_error;
@@ -1640,7 +1625,7 @@ static int audamrwb_open(struct inode *inode, struct file *file)
 		goto output_buff_get_flags_error;
 	}
 
-	audio->map_v_write = ion_map_kernel(client, handle);
+	audio->map_v_write = ion_map_kernel(client, handle, ionflag);
 	if (IS_ERR(audio->map_v_write)) {
 		MM_ERR("could not map write buffers\n");
 		rc = -ENOMEM;

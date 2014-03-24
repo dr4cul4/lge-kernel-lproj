@@ -1,6 +1,6 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
-   Copyright (c) 2000-2001, 2010-2012 The Linux Foundation.  All rights reserved.
+   Copyright (c) 2000-2001, 2010-2012 Code Aurora Forum.  All rights reserved.
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -77,7 +77,6 @@ DEFINE_RWLOCK(amp_mgr_cb_list_lock);
 /* HCI protocols */
 #define HCI_MAX_PROTO	2
 struct hci_proto *hci_proto[HCI_MAX_PROTO];
-struct sco_proto *sco_protoc = NULL;
 
 /* HCI notifiers list */
 static ATOMIC_NOTIFIER_HEAD(hci_notifier);
@@ -306,12 +305,6 @@ static void hci_le_init_req(struct hci_dev *hdev, unsigned long opt)
 
 	/* Read LE buffer size */
 	hci_send_cmd(hdev, HCI_OP_LE_READ_BUFFER_SIZE, 0, NULL);
-
-	/* Read LE clear white list */
-	hci_send_cmd(hdev, HCI_OP_LE_CLEAR_WHITE_LIST, 0, NULL);
-
-	/* Read LE white list size */
-	hci_send_cmd(hdev, HCI_OP_LE_READ_WHITE_LIST_SIZE, 0, NULL);
 }
 
 static void hci_scan_req(struct hci_dev *hdev, unsigned long opt)
@@ -1918,54 +1911,6 @@ int hci_unregister_amp(struct amp_mgr_cb *cb)
 }
 EXPORT_SYMBOL(hci_unregister_amp);
 
-/* Register/Unregister protocols. */
-int hci_sco_register_proto(struct sco_proto *sp)
-{
-	int err = 0;
-
-	BT_DBG("sp %p", sp);
-
-	write_lock_bh(&hci_task_lock);
-
-	if (!sco_protoc)
-		sco_protoc = sp;
-	else
-		err = -EEXIST;
-
-	write_unlock_bh(&hci_task_lock);
-
-	return err;
-}
-EXPORT_SYMBOL(hci_sco_register_proto);
-
-int hci_sco_unregister_proto(void)
-{
-	int err = 0;
-
-	write_lock_bh(&hci_task_lock);
-
-	if (sco_protoc)
-		sco_protoc = NULL;
-	else
-		err = -ENOENT;
-
-	write_unlock_bh(&hci_task_lock);
-
-	return err;
-}
-EXPORT_SYMBOL(hci_sco_unregister_proto);
-
-void hci_register_sco_cb(struct sco_cb *cb, bool reg)
-{
-	if (!sco_protoc || !sco_protoc->register_cb || !sco_protoc->unregister_cb)
-		return;
-
-	if (reg)
-		sco_protoc->register_cb(cb);
-	else
-		sco_protoc->unregister_cb(cb);
-}
-
 void hci_amp_cmd_complete(struct hci_dev *hdev, __u16 opcode,
 			struct sk_buff *skb)
 {
@@ -2179,55 +2124,6 @@ void hci_send_sco(struct hci_conn *conn, struct sk_buff *skb)
 EXPORT_SYMBOL(hci_send_sco);
 
 /* ---- HCI TX task (outgoing data) ---- */
-/* HCI ACL Connection scheduler */
-static inline struct hci_conn *hci_low_sent_acl(struct hci_dev *hdev,
-								int *quote)
-{
-	struct hci_conn_hash *h = &hdev->conn_hash;
-	struct hci_conn *conn = NULL;
-	int num = 0, min = ~0, conn_num = 0;
-	struct list_head *p;
-
-	/* We don't have to lock device here. Connections are always
-	 * added and removed with TX task disabled. */
-	list_for_each(p, &h->list) {
-		struct hci_conn *c;
-		c = list_entry(p, struct hci_conn, list);
-		if (c->type == ACL_LINK)
-			conn_num++;
-
-		if (skb_queue_empty(&c->data_q))
-			continue;
-
-		if (c->state != BT_CONNECTED && c->state != BT_CONFIG)
-			continue;
-
-		num++;
-
-		if (c->sent < min) {
-			min  = c->sent;
-			conn = c;
-		}
-	}
-
-	if (conn) {
-		int cnt, q;
-		cnt = hdev->acl_cnt;
-		q = cnt / num;
-		*quote = q ? q : 1;
-	} else
-		*quote = 0;
-
-	if ((*quote == hdev->acl_cnt) &&
-		(conn->sent == (hdev->acl_pkts - 1)) &&
-		(conn_num > 1)) {
-			*quote = 0;
-			conn = NULL;
-	}
-
-	BT_DBG("conn %p quote %d", conn, *quote);
-	return conn;
-}
 
 /* HCI Connection scheduler */
 static inline struct hci_conn *hci_low_sent(struct hci_dev *hdev, __u8 type, int *quote)
@@ -2321,10 +2217,8 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 	}
 
 	while (hdev->acl_cnt > 0 &&
-		((conn = hci_low_sent_acl(hdev, &quote)) != NULL)) {
-
-		while (quote > 0 &&
-			  (skb = skb_dequeue(&conn->data_q))) {
+		(conn = hci_low_sent(hdev, ACL_LINK, &quote))) {
+		while (quote > 0 && (skb = skb_dequeue(&conn->data_q))) {
 			int count = 1;
 
 			BT_DBG("skb %p len %d", skb, skb->len);
@@ -2340,6 +2234,7 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 			if (count > hdev->acl_cnt)
 				return;
 
+			hci_dev_lock(hdev);
 			hci_conn_enter_active_mode(conn, bt_cb(skb)->force_active);
 
 			hci_send_frame(skb);
@@ -2349,6 +2244,7 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 			quote -= count;
 
 			conn->sent += count;
+			hci_dev_unlock(hdev);
 		}
 	}
 }

@@ -3,7 +3,7 @@
  * interface to "snd" service on the baseband cpu
  * This code also borrows from snd.c, which is
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009, 2012 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009, 2012 Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -373,9 +373,8 @@ static long snd_cad_ioctl(struct file *file, unsigned int cmd,
 		vmsg.args.device.rx_device = cpu_to_be32(dev.device.rx_device);
 		vmsg.args.device.tx_device = cpu_to_be32(dev.device.tx_device);
 		vmsg.args.method = cpu_to_be32(vol.method);
-		if (vol.method != SND_METHOD_VOICE &&
-				vol.method != SND_METHOD_MIDI) {
-			MM_ERR("set volume: invalid method %d\n", vol.method);
+		if (vol.method != SND_METHOD_VOICE) {
+			MM_ERR("set volume: invalid method\n");
 			rc = -EINVAL;
 			break;
 		}
@@ -496,7 +495,6 @@ case SND_SET_NREC:
 /* LGE_CHANGE_E :  Bluetooth NERC Cmd Support */
 #endif
 /*LGE_CHANBE_E : seven.kim@lge.com kernel3.0 porting based on kernel2.6.38*/
-
 
 	default:
 		MM_ERR("unknown command\n");
@@ -619,7 +617,7 @@ static long snd_cad_vol_enable(const char *arg)
 	vmsg.args.device.rx_device = cpu_to_be32(vol.device.rx_device);
 	vmsg.args.device.tx_device = cpu_to_be32(vol.device.tx_device);
 	vmsg.args.method = cpu_to_be32(vol.method);
-	if (vol.method != SND_METHOD_VOICE && vol.method != SND_METHOD_MIDI) {
+	if (vol.method != SND_METHOD_VOICE) {
 		MM_ERR("snd_cad_ioctl set volume: invalid method\n");
 		rc = -EINVAL;
 		return rc;
@@ -630,7 +628,7 @@ static long snd_cad_vol_enable(const char *arg)
 	vmsg.args.client_data = 0;
 
 	MM_DBG("snd_cad_set_volume %d %d %d %d\n", vol.device.rx_device,
-			vol.device.tx_device, vol.method, vol.volume);
+			vol.device.rx_device, vol.method, vol.volume);
 
 	rc = msm_rpc_call(snd_cad_sys->ept,
 		SND_CAD_SET_VOLUME_PROC,
