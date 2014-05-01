@@ -27,7 +27,9 @@ if [ -z $target ]; then
 fi # [ -z $target ]
 
 if [ -z $compiler ]; then
-    if [ -f ../arm-eabi-4.6/bin/arm-eabi-* ]; then
+    if [ -f $ARM_EABI_TOOLCHAIN/arm-eabi-gcc ]; then
+        export compiler=$ARM_EABI_TOOLCHAIN/arm-eabi-
+    elif [ -f ../arm-eabi-4.6/bin/arm-eabi-* ]; then
         export compiler=../arm-eabi-4.6/bin/arm-eabi-
     elif [ -f arm-eabi-4.6/bin/arm-eabi-* ]; then # [ -f ../arm-eabi-4.6/bin/arm-eabi-* ]
         export compiler=arm-eabi-4.6/bin/arm-eabi-
